@@ -208,42 +208,14 @@
 
 <body class="court-bg min-h-screen text-slate-200 antialiased">
 
-<!-- ╔══════════════════════════════════════════╗ -->
-<!-- ║            CONFIG MODAL                 ║ -->
-<!-- ╚══════════════════════════════════════════╝ -->
-<div id="config-overlay" class="fixed inset-0 z-[999] flex items-center justify-center p-4"
-     style="backdrop-filter:blur(8px); background:rgba(10,10,15,.85);">
-  <div class="glass rounded-2xl p-8 w-full max-w-md animate-slide-up shadow-2xl">
-    <div class="flex items-center gap-3 mb-6">
-      <span class="text-4xl">🏀</span>
-      <div>
-        <h1 class="font-display text-3xl text-white tracking-wider">HOOPSTRACK</h1>
-        <p class="text-slate-400 text-sm">Configure sua conexão com o Supabase</p>
-      </div>
-    </div>
-    <div class="space-y-4">
-      <div>
-        <label class="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-1.5 block">Supabase URL</label>
-        <input id="cfg-url" type="url" class="form-input" placeholder="https://xxxx.supabase.co" />
-      </div>
-      <div>
-        <label class="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-1.5 block">Anon Key</label>
-        <input id="cfg-key" type="password" class="form-input" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." />
-      </div>
-      <div class="pt-2">
-        <button id="cfg-save-btn" class="btn-primary w-full text-base py-3" onclick="App.saveConfig()">
-          🔗 Conectar ao Supabase
-        </button>
-      </div>
-      <p class="text-xs text-slate-500 text-center">As credenciais ficam salvas localmente no navegador.</p>
-    </div>
-  </div>
-</div>
+<!-- Inputs ocultos para manter compatibilidade interna -->
+<input id="cfg-url" type="hidden" />
+<input id="cfg-key" type="hidden" />
 
 <!-- ╔══════════════════════════════════════════╗ -->
 <!-- ║           MAIN APP SHELL                ║ -->
 <!-- ╚══════════════════════════════════════════╝ -->
-<div id="app" class="hidden flex flex-col min-h-screen">
+<div id="app" class="flex flex-col min-h-screen">
 
   <!-- ── HEADER ── -->
   <header class="sticky top-0 z-50 glass border-b border-white/[0.07] px-4 md:px-8">
@@ -606,13 +578,8 @@ const App = {
   async init(url, key) {
     try {
       supabase = window.supabase.createClient(url, key);
-      // Quick connectivity check
       const { error } = await supabase.from('basketball_workouts').select('id').limit(1);
       if (error) throw error;
-
-      document.getElementById('config-overlay').classList.add('hidden');
-      document.getElementById('app').classList.remove('hidden');
-      document.getElementById('app').classList.add('flex');
 
       App.setView('dashboard');
       await App.loadAll();
