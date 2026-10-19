@@ -1135,15 +1135,17 @@ document.addEventListener('keydown', e => {
   }
 });
 
-/* ── Auto-init from localStorage ── */
+/* ── Credenciais Supabase (anon/publishable key — seguro expor no front-end) ── */
+const SUPABASE_URL = 'https://lxhxyojyrsqnoraronuh.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_TOedHiWyvpDnQqnyZdyMpQ_EozNJymv';
+
+/* ── Auto-init: tenta localStorage primeiro, depois usa as credenciais padrão ── */
 (function bootstrap() {
-  const url = localStorage.getItem('ht_url');
-  const key = localStorage.getItem('ht_key');
-  if (url && key) {
-    document.getElementById('cfg-url').value = url;
-    document.getElementById('cfg-key').value = key;
-    App.init(url, key);
-  }
+  const url = localStorage.getItem('ht_url') || SUPABASE_URL;
+  const key = localStorage.getItem('ht_key') || SUPABASE_KEY;
+  document.getElementById('cfg-url').value = url;
+  document.getElementById('cfg-key').value = key;
+  App.init(url, key);
 })();
 </script>
 </body>
