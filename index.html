@@ -1,0 +1,1150 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HoopsTrack — Basketball Workout Tracker</title>
+
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Supabase JS Client -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- Google Fonts: Inter + Bebas Neue -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            display: ['Bebas Neue', 'cursive'],
+          },
+          colors: {
+            brand: {
+              50:  '#fff7ed',
+              100: '#ffedd5',
+              200: '#fed7aa',
+              300: '#fdba74',
+              400: '#fb923c',
+              500: '#f97316',
+              600: '#ea580c',
+              700: '#c2410c',
+              800: '#9a3412',
+              900: '#7c2d12',
+            },
+            court: {
+              950: '#0a0a0f',
+              900: '#0f0f1a',
+              800: '#14141f',
+              700: '#1a1a2e',
+              600: '#1e1e35',
+              500: '#25253d',
+            }
+          },
+          animation: {
+            'fade-in': 'fadeIn .35s ease-out',
+            'slide-up': 'slideUp .35s ease-out',
+            'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            'shimmer': 'shimmer 2s infinite linear',
+          },
+          keyframes: {
+            fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
+            slideUp: { '0%': { opacity: '0', transform: 'translateY(20px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
+            shimmer: { '0%': { backgroundPosition: '-1000px 0' }, '100%': { backgroundPosition: '1000px 0' } },
+          },
+          boxShadow: {
+            'glow-orange': '0 0 20px rgba(249,115,22,0.35)',
+            'glow-sm': '0 0 10px rgba(249,115,22,0.2)',
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* ── Base ── */
+    *, *::before, *::after { box-sizing: border-box; }
+    body { background-color: #0a0a0f; font-family: 'Inter', sans-serif; }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #0f0f1a; }
+    ::-webkit-scrollbar-thumb { background: #f97316; border-radius: 3px; }
+
+    /* ── Court texture overlay ── */
+    .court-bg {
+      background-color: #0a0a0f;
+      background-image:
+        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(249,115,22,0.12) 0%, transparent 60%),
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Crect width='60' height='60' fill='none'/%3E%3Cpath d='M0 0 L60 0 L60 60 L0 60 Z' fill='none' stroke='rgba(255,255,255,0.015)' stroke-width='1'/%3E%3C/svg%3E");
+    }
+
+    /* ── Glass card ── */
+    .glass {
+      background: rgba(255,255,255,0.04);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    /* ── Skeleton shimmer ── */
+    .skeleton {
+      background: linear-gradient(90deg, #1a1a2e 25%, #25253d 50%, #1a1a2e 75%);
+      background-size: 1000px 100%;
+      animation: shimmer 2s infinite linear;
+      border-radius: 8px;
+    }
+
+    /* ── Category badge colors ── */
+    .badge-ball    { background: rgba(251,146,60,.15); color: #fb923c; border-color: rgba(251,146,60,.3); }
+    .badge-shoot   { background: rgba(250,204,21,.15); color: #facc15; border-color: rgba(250,204,21,.3); }
+    .badge-plyo    { background: rgba(52,211,153,.15); color: #34d399; border-color: rgba(52,211,153,.3); }
+    .badge-gym     { background: rgba(167,139,250,.15); color: #a78bfa; border-color: rgba(167,139,250,.3); }
+    .badge-game    { background: rgba(96,165,250,.15);  color: #60a5fa; border-color: rgba(96,165,250,.3); }
+
+    /* ── Progress bar ── */
+    .progress-fill {
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #ea580c, #f97316, #fb923c);
+      transition: width .6s cubic-bezier(.4,0,.2,1);
+    }
+
+    /* ── RPE indicator ── */
+    .rpe-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+    /* ── Modal backdrop ── */
+    #modal-overlay {
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+    }
+
+    /* ── Custom select & input ── */
+    .form-input {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: #f1f5f9;
+      border-radius: 10px;
+      padding: 0.65rem 1rem;
+      width: 100%;
+      transition: border-color .2s, box-shadow .2s;
+      font-family: 'Inter', sans-serif;
+    }
+    .form-input:focus {
+      outline: none;
+      border-color: #f97316;
+      box-shadow: 0 0 0 3px rgba(249,115,22,0.18);
+    }
+    .form-input::placeholder { color: rgba(148,163,184,.45); }
+    .form-input option { background: #14141f; }
+
+    /* ── Btn ── */
+    .btn-primary {
+      background: linear-gradient(135deg, #ea580c, #f97316);
+      color: #fff;
+      font-weight: 600;
+      border-radius: 10px;
+      padding: 0.65rem 1.4rem;
+      transition: opacity .2s, transform .15s, box-shadow .2s;
+      border: none;
+      cursor: pointer;
+    }
+    .btn-primary:hover { opacity: .92; transform: translateY(-1px); box-shadow: 0 0 18px rgba(249,115,22,.4); }
+    .btn-primary:active { transform: translateY(0); }
+
+    .btn-ghost {
+      background: rgba(255,255,255,0.06);
+      color: #94a3b8;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      padding: 0.65rem 1.4rem;
+      transition: background .2s, color .2s;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    .btn-ghost:hover { background: rgba(255,255,255,0.1); color: #f1f5f9; }
+
+    /* ── Workout card hover ── */
+    .workout-card { transition: transform .2s, box-shadow .2s; }
+    .workout-card:hover { transform: translateY(-3px); box-shadow: 0 12px 40px rgba(0,0,0,.5); }
+
+    /* ── Toast ── */
+    #toast-container { pointer-events: none; }
+    .toast {
+      pointer-events: auto;
+      animation: slideUp .3s ease-out;
+      border-left: 3px solid #f97316;
+    }
+
+    /* ── Stat card ── */
+    .stat-card { transition: transform .2s; }
+    .stat-card:hover { transform: translateY(-2px); }
+
+    /* ── Nav item ── */
+    .nav-item.active .nav-indicator { opacity: 1; }
+    .nav-item.active .nav-label { color: #f97316; }
+    .nav-item.active .nav-icon { color: #f97316; }
+
+    /* ── Filter tab active ── */
+    .filter-tab.active {
+      background: rgba(249,115,22,.18);
+      color: #f97316;
+      border-color: rgba(249,115,22,.4);
+    }
+
+    /* ── Radial chart ── */
+    .radial-ring {
+      transform: rotate(-90deg);
+      transform-origin: 50% 50%;
+    }
+  </style>
+</head>
+
+<body class="court-bg min-h-screen text-slate-200 antialiased">
+
+<!-- ╔══════════════════════════════════════════╗ -->
+<!-- ║            CONFIG MODAL                 ║ -->
+<!-- ╚══════════════════════════════════════════╝ -->
+<div id="config-overlay" class="fixed inset-0 z-[999] flex items-center justify-center p-4"
+     style="backdrop-filter:blur(8px); background:rgba(10,10,15,.85);">
+  <div class="glass rounded-2xl p-8 w-full max-w-md animate-slide-up shadow-2xl">
+    <div class="flex items-center gap-3 mb-6">
+      <span class="text-4xl">🏀</span>
+      <div>
+        <h1 class="font-display text-3xl text-white tracking-wider">HOOPSTRACK</h1>
+        <p class="text-slate-400 text-sm">Configure sua conexão com o Supabase</p>
+      </div>
+    </div>
+    <div class="space-y-4">
+      <div>
+        <label class="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-1.5 block">Supabase URL</label>
+        <input id="cfg-url" type="url" class="form-input" placeholder="https://xxxx.supabase.co" />
+      </div>
+      <div>
+        <label class="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-1.5 block">Anon Key</label>
+        <input id="cfg-key" type="password" class="form-input" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." />
+      </div>
+      <div class="pt-2">
+        <button id="cfg-save-btn" class="btn-primary w-full text-base py-3" onclick="App.saveConfig()">
+          🔗 Conectar ao Supabase
+        </button>
+      </div>
+      <p class="text-xs text-slate-500 text-center">As credenciais ficam salvas localmente no navegador.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ╔══════════════════════════════════════════╗ -->
+<!-- ║           MAIN APP SHELL                ║ -->
+<!-- ╚══════════════════════════════════════════╝ -->
+<div id="app" class="hidden flex flex-col min-h-screen">
+
+  <!-- ── HEADER ── -->
+  <header class="sticky top-0 z-50 glass border-b border-white/[0.07] px-4 md:px-8">
+    <div class="max-w-7xl mx-auto flex items-center justify-between h-16">
+      <!-- Logo -->
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center shadow-glow-sm">
+          <span class="text-lg">🏀</span>
+        </div>
+        <span class="font-display text-2xl tracking-widest text-white hidden sm:block">HOOPSTRACK</span>
+      </div>
+
+      <!-- Desktop Nav -->
+      <nav class="hidden md:flex items-center gap-1">
+        <button onclick="App.setView('dashboard')" data-view="dashboard"
+          class="nav-item px-4 py-2 rounded-xl text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 transition-all flex items-center gap-2 relative group">
+          <svg class="nav-icon w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h4a1 1 0 011 1v5a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v5a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zM14 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"/></svg>
+          <span class="nav-label">Dashboard</span>
+          <div class="nav-indicator absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 bg-brand-500 rounded-full opacity-0 transition-opacity"></div>
+        </button>
+        <button onclick="App.setView('workouts')" data-view="workouts"
+          class="nav-item px-4 py-2 rounded-xl text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 transition-all flex items-center gap-2 relative group">
+          <svg class="nav-icon w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
+          <span class="nav-label">Treinos</span>
+          <div class="nav-indicator absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 bg-brand-500 rounded-full opacity-0 transition-opacity"></div>
+        </button>
+        <button onclick="App.setView('stats')" data-view="stats"
+          class="nav-item px-4 py-2 rounded-xl text-sm font-medium text-slate-400 hover:text-white hover:bg-white/5 transition-all flex items-center gap-2 relative group">
+          <svg class="nav-icon w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+          <span class="nav-label">Estatísticas</span>
+          <div class="nav-indicator absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 bg-brand-500 rounded-full opacity-0 transition-opacity"></div>
+        </button>
+      </nav>
+
+      <!-- Actions -->
+      <div class="flex items-center gap-2">
+        <button onclick="App.openModal()" id="new-workout-btn"
+          class="btn-primary flex items-center gap-2 text-sm px-4 py-2">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+          <span class="hidden sm:inline">Novo Treino</span>
+        </button>
+        <button onclick="App.resetConfig()" title="Reconfigurar Supabase"
+          class="w-9 h-9 rounded-xl glass flex items-center justify-center text-slate-400 hover:text-brand-400 transition-colors">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── VIEWS ── -->
+  <main class="flex-1 max-w-7xl mx-auto w-full px-4 md:px-8 pb-24 md:pb-8">
+
+    <!-- ▸ DASHBOARD VIEW ── -->
+    <section id="view-dashboard" class="view py-8 animate-fade-in">
+
+      <!-- Welcome banner -->
+      <div class="relative glass rounded-2xl overflow-hidden mb-8 p-6 md:p-8">
+        <div class="absolute inset-0 bg-gradient-to-r from-brand-700/40 to-transparent pointer-events-none"></div>
+        <div class="relative flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            <p class="text-brand-400 text-sm font-semibold uppercase tracking-widest mb-1">Let's get to work</p>
+            <h2 class="font-display text-4xl md:text-5xl text-white tracking-wider">BOM DIA, ATLETA</h2>
+            <p class="text-slate-400 mt-1" id="dashboard-date"></p>
+          </div>
+          <div class="text-right">
+            <p class="text-xs text-slate-500 uppercase tracking-widest mb-1">Treinos este mês</p>
+            <p class="font-display text-5xl text-brand-400" id="stat-month-count">—</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stat cards row -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8" id="stat-cards">
+        <div class="skeleton h-28"></div>
+        <div class="skeleton h-28"></div>
+        <div class="skeleton h-28"></div>
+        <div class="skeleton h-28"></div>
+      </div>
+
+      <!-- Recent + Category breakdown -->
+      <div class="grid md:grid-cols-5 gap-6">
+        <!-- Recent workouts -->
+        <div class="md:col-span-3 glass rounded-2xl p-5">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold text-white">Treinos Recentes</h3>
+            <button onclick="App.setView('workouts')" class="text-xs text-brand-400 hover:underline">Ver todos →</button>
+          </div>
+          <div id="recent-list" class="space-y-3"></div>
+        </div>
+        <!-- Category donut -->
+        <div class="md:col-span-2 glass rounded-2xl p-5 flex flex-col">
+          <h3 class="font-semibold text-white mb-4">Por Categoria</h3>
+          <div class="flex-1 flex items-center justify-center" id="donut-wrap"></div>
+          <div id="donut-legend" class="mt-4 space-y-2"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ▸ WORKOUTS VIEW ── -->
+    <section id="view-workouts" class="view py-8 animate-fade-in hidden">
+
+      <!-- Toolbar -->
+      <div class="flex flex-col sm:flex-row gap-3 mb-6">
+        <div class="relative flex-1">
+          <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          <input id="search-input" type="text" placeholder="Buscar treino..." class="form-input pl-10"
+            oninput="App.applyFilters()" />
+        </div>
+        <select id="sort-select" class="form-input sm:w-44" onchange="App.applyFilters()">
+          <option value="created_at_desc">Mais recentes</option>
+          <option value="created_at_asc">Mais antigos</option>
+          <option value="duration_desc">+ Duração</option>
+          <option value="rpe_desc">+ Intensidade</option>
+        </select>
+      </div>
+
+      <!-- Category filter tabs -->
+      <div class="flex flex-wrap gap-2 mb-6" id="filter-tabs">
+        <button class="filter-tab active px-3 py-1.5 rounded-xl text-xs font-semibold border border-white/10 text-slate-300 transition-all" data-cat="" onclick="App.setCatFilter(this, '')">Todos</button>
+        <button class="filter-tab px-3 py-1.5 rounded-xl text-xs font-semibold border border-white/10 text-slate-300 transition-all" data-cat="Ball-Handling" onclick="App.setCatFilter(this,'Ball-Handling')">🏀 Ball-Handling</button>
+        <button class="filter-tab px-3 py-1.5 rounded-xl text-xs font-semibold border border-white/10 text-slate-300 transition-all" data-cat="Arremesso" onclick="App.setCatFilter(this,'Arremesso')">🎯 Arremesso</button>
+        <button class="filter-tab px-3 py-1.5 rounded-xl text-xs font-semibold border border-white/10 text-slate-300 transition-all" data-cat="Salto / Plyo" onclick="App.setCatFilter(this,'Salto / Plyo')">⬆️ Salto / Plyo</button>
+        <button class="filter-tab px-3 py-1.5 rounded-xl text-xs font-semibold border border-white/10 text-slate-300 transition-all" data-cat="Musculação" onclick="App.setCatFilter(this,'Musculação')">💪 Musculação</button>
+        <button class="filter-tab px-3 py-1.5 rounded-xl text-xs font-semibold border border-white/10 text-slate-300 transition-all" data-cat="Jogo / Coletivo" onclick="App.setCatFilter(this,'Jogo / Coletivo')">🏆 Jogo / Coletivo</button>
+      </div>
+
+      <!-- Status filter -->
+      <div class="flex gap-2 mb-6">
+        <button class="filter-tab active px-3 py-1.5 rounded-xl text-xs font-semibold border border-white/10 text-slate-300 transition-all" data-status="" onclick="App.setStatusFilter(this,'')">Todos Status</button>
+        <button class="filter-tab px-3 py-1.5 rounded-xl text-xs font-semibold border border-white/10 text-slate-300 transition-all" data-status="true" onclick="App.setStatusFilter(this,'true')">✅ Concluídos</button>
+        <button class="filter-tab px-3 py-1.5 rounded-xl text-xs font-semibold border border-white/10 text-slate-300 transition-all" data-status="false" onclick="App.setStatusFilter(this,'false')">⏳ Pendentes</button>
+      </div>
+
+      <!-- Workouts grid -->
+      <div id="workouts-grid" class="grid sm:grid-cols-2 xl:grid-cols-3 gap-4 animate-fade-in">
+        <div class="skeleton h-52 rounded-2xl"></div>
+        <div class="skeleton h-52 rounded-2xl"></div>
+        <div class="skeleton h-52 rounded-2xl"></div>
+      </div>
+    </section>
+
+    <!-- ▸ STATS VIEW ── -->
+    <section id="view-stats" class="view py-8 animate-fade-in hidden">
+      <h2 class="font-display text-3xl text-white tracking-wider mb-8">ESTATÍSTICAS GERAIS</h2>
+      <div id="stats-content" class="grid md:grid-cols-2 gap-6"></div>
+    </section>
+
+  </main>
+
+  <!-- ── MOBILE BOTTOM NAV ── -->
+  <nav class="md:hidden fixed bottom-0 left-0 right-0 z-50 glass border-t border-white/[0.07]">
+    <div class="flex">
+      <button onclick="App.setView('dashboard')" data-view-m="dashboard"
+        class="nav-m flex-1 flex flex-col items-center py-3 text-slate-500 hover:text-brand-400 transition-colors">
+        <svg class="w-5 h-5 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h4a1 1 0 011 1v5a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v5a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zM14 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"/></svg>
+        <span class="text-[10px] font-medium">Home</span>
+      </button>
+      <button onclick="App.setView('workouts')" data-view-m="workouts"
+        class="nav-m flex-1 flex flex-col items-center py-3 text-slate-500 hover:text-brand-400 transition-colors">
+        <svg class="w-5 h-5 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
+        <span class="text-[10px] font-medium">Treinos</span>
+      </button>
+      <button onclick="App.openModal()"
+        class="flex-1 flex flex-col items-center py-2 text-brand-400">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center shadow-glow-sm -mt-4">
+          <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+        </div>
+        <span class="text-[10px] font-medium mt-1">Novo</span>
+      </button>
+      <button onclick="App.setView('stats')" data-view-m="stats"
+        class="nav-m flex-1 flex flex-col items-center py-3 text-slate-500 hover:text-brand-400 transition-colors">
+        <svg class="w-5 h-5 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+        <span class="text-[10px] font-medium">Stats</span>
+      </button>
+    </div>
+  </nav>
+
+</div><!-- /#app -->
+
+<!-- ╔══════════════════════════════════════════╗ -->
+<!-- ║         WORKOUT MODAL (Create/Edit)     ║ -->
+<!-- ╚══════════════════════════════════════════╝ -->
+<div id="modal-overlay" class="hidden fixed inset-0 z-[200] flex items-center justify-center p-4"
+     style="background:rgba(0,0,0,.7);" onclick="App.handleOverlayClick(event)">
+  <div id="modal-box" class="glass rounded-2xl w-full max-w-xl shadow-2xl max-h-[90vh] overflow-y-auto animate-slide-up">
+    <div class="flex items-center justify-between p-5 border-b border-white/[0.07]">
+      <h2 id="modal-title" class="font-display text-2xl text-white tracking-wider">NOVO TREINO</h2>
+      <button onclick="App.closeModal()" class="w-8 h-8 rounded-lg glass flex items-center justify-center text-slate-400 hover:text-white transition-colors">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <form id="workout-form" class="p-5 space-y-4" onsubmit="App.saveWorkout(event)">
+      <input type="hidden" id="form-id" />
+
+      <!-- Title -->
+      <div>
+        <label class="form-label">Título do Treino *</label>
+        <input id="form-title" type="text" class="form-input" placeholder="Ex: Dribble Series — Crossover & Behind Back" required maxlength="120" />
+      </div>
+
+      <!-- Category + Metrics Type -->
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="form-label">Categoria *</label>
+          <select id="form-category" class="form-input" required onchange="App.updateMetricsLabel()">
+            <option value="">Selecione...</option>
+            <option value="Ball-Handling">🏀 Ball-Handling</option>
+            <option value="Arremesso">🎯 Arremesso</option>
+            <option value="Salto / Plyo">⬆️ Salto / Plyo</option>
+            <option value="Musculação">💪 Musculação</option>
+            <option value="Jogo / Coletivo">🏆 Jogo / Coletivo</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Tipo de Métrica</label>
+          <select id="form-metrics-type" class="form-input" onchange="App.updateMetricsLabel()">
+            <option value="Repetições">Reps / Séries</option>
+            <option value="Volume">Volume / Converter</option>
+            <option value="Tempo">Tempo (min)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Volume -->
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="form-label" id="lbl-target">Meta de Volume</label>
+          <input id="form-volume-target" type="number" min="0" class="form-input" placeholder="Ex: 250" />
+        </div>
+        <div>
+          <label class="form-label" id="lbl-completed">Volume Realizado</label>
+          <input id="form-volume-completed" type="number" min="0" class="form-input" placeholder="Ex: 200" />
+        </div>
+      </div>
+
+      <!-- Duration + RPE -->
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="form-label">Duração (min) *</label>
+          <input id="form-duration" type="number" min="1" max="480" class="form-input" placeholder="45" required />
+        </div>
+        <div>
+          <label class="form-label">Intensidade RPE (1–10)</label>
+          <input id="form-rpe" type="number" min="1" max="10" class="form-input" placeholder="7" />
+        </div>
+      </div>
+
+      <!-- RPE Visual -->
+      <div id="rpe-visual" class="flex gap-1.5 justify-center hidden">
+        <!-- filled by JS -->
+      </div>
+
+      <!-- Notes -->
+      <div>
+        <label class="form-label">Observações</label>
+        <textarea id="form-notes" class="form-input resize-none" rows="3" placeholder="Ex: PR na série de 3 dribbles consecutivos..."></textarea>
+      </div>
+
+      <!-- Completed -->
+      <label class="flex items-center gap-3 cursor-pointer group">
+        <div class="relative">
+          <input id="form-completed" type="checkbox" class="sr-only peer" />
+          <div class="w-11 h-6 bg-white/10 rounded-full peer-checked:bg-brand-600 transition-colors"></div>
+          <div class="absolute left-1 top-1 w-4 h-4 bg-white rounded-full shadow transition-transform peer-checked:translate-x-5"></div>
+        </div>
+        <span class="text-sm text-slate-300 group-hover:text-white transition-colors">Treino concluído</span>
+      </label>
+
+      <!-- Actions -->
+      <div class="flex gap-3 pt-2">
+        <button type="button" onclick="App.closeModal()" class="btn-ghost flex-1">Cancelar</button>
+        <button type="submit" id="form-submit-btn" class="btn-primary flex-1 flex items-center justify-center gap-2">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+          Salvar Treino
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ╔══════════════════════════════════════════╗ -->
+<!-- ║         DELETE CONFIRM MODAL            ║ -->
+<!-- ╚══════════════════════════════════════════╝ -->
+<div id="delete-overlay" class="hidden fixed inset-0 z-[300] flex items-center justify-center p-4"
+     style="background:rgba(0,0,0,.75); backdrop-filter:blur(4px);">
+  <div class="glass rounded-2xl p-6 w-full max-w-sm shadow-2xl animate-slide-up text-center">
+    <div class="w-14 h-14 rounded-full bg-red-500/15 flex items-center justify-center mx-auto mb-4">
+      <svg class="w-7 h-7 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+    </div>
+    <h3 class="font-semibold text-white text-lg mb-1">Deletar treino?</h3>
+    <p class="text-slate-400 text-sm mb-6">Esta ação não pode ser desfeita.</p>
+    <div class="flex gap-3">
+      <button onclick="App.closeDelete()" class="btn-ghost flex-1">Cancelar</button>
+      <button id="confirm-delete-btn" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl py-2.5 transition-colors cursor-pointer">Deletar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Container -->
+<div id="toast-container" class="fixed bottom-24 md:bottom-6 right-4 z-[500] flex flex-col gap-2 items-end"></div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- JAVASCRIPT APPLICATION                                -->
+<!-- ══════════════════════════════════════════════════════ -->
+<style>
+  .form-label { display: block; font-size:.7rem; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:.08em; margin-bottom:.35rem; }
+  .view.hidden { display:none!important; }
+</style>
+
+<script>
+'use strict';
+
+/* ── Supabase singleton ── */
+let supabase = null;
+
+/* ── State ── */
+const State = {
+  workouts: [],
+  filtered: [],
+  catFilter: '',
+  statusFilter: '',
+  deleteId: null,
+  currentView: 'dashboard',
+};
+
+/* ── Constants ── */
+const CATEGORIES = ['Ball-Handling','Arremesso','Salto / Plyo','Musculação','Jogo / Coletivo'];
+const CAT_META = {
+  'Ball-Handling': { emoji:'🏀', badge:'badge-ball',  color:'#fb923c' },
+  'Arremesso':     { emoji:'🎯', badge:'badge-shoot', color:'#facc15' },
+  'Salto / Plyo':  { emoji:'⬆️', badge:'badge-plyo',  color:'#34d399' },
+  'Musculação':    { emoji:'💪', badge:'badge-gym',   color:'#a78bfa' },
+  'Jogo / Coletivo':{ emoji:'🏆',badge:'badge-game',  color:'#60a5fa' },
+};
+
+const RPE_COLORS = ['','#22c55e','#4ade80','#a3e635','#d9f99d','#fde047','#fb923c','#f97316','#ef4444','#dc2626','#991b1b'];
+
+/* ══════════════════════════════════════════════════════ */
+/* App Object                                            */
+/* ══════════════════════════════════════════════════════ */
+const App = {
+
+  /* ── Config / Init ── */
+  saveConfig() {
+    const url = document.getElementById('cfg-url').value.trim();
+    const key = document.getElementById('cfg-key').value.trim();
+    if (!url || !key) { App.toast('Preencha a URL e a Anon Key.', 'error'); return; }
+    localStorage.setItem('ht_url', url);
+    localStorage.setItem('ht_key', key);
+    App.init(url, key);
+  },
+
+  resetConfig() {
+    localStorage.removeItem('ht_url');
+    localStorage.removeItem('ht_key');
+    document.getElementById('app').classList.add('hidden');
+    document.getElementById('config-overlay').classList.remove('hidden');
+  },
+
+  async init(url, key) {
+    try {
+      supabase = window.supabase.createClient(url, key);
+      // Quick connectivity check
+      const { error } = await supabase.from('basketball_workouts').select('id').limit(1);
+      if (error) throw error;
+
+      document.getElementById('config-overlay').classList.add('hidden');
+      document.getElementById('app').classList.remove('hidden');
+      document.getElementById('app').classList.add('flex');
+
+      App.setView('dashboard');
+      await App.loadAll();
+      App.toast('🏀 Conectado ao Supabase!', 'success');
+    } catch(e) {
+      App.toast('Erro de conexão: ' + (e.message || 'verifique URL e Key'), 'error');
+    }
+  },
+
+  /* ── Data ── */
+  async loadAll() {
+    const { data, error } = await supabase
+      .from('basketball_workouts')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) { App.toast('Erro ao carregar treinos: ' + error.message, 'error'); return; }
+    State.workouts = data || [];
+    State.filtered = [...State.workouts];
+
+    App.renderDashboard();
+    App.applyFilters();
+    App.renderStats();
+  },
+
+  /* ── CRUD ── */
+  async saveWorkout(e) {
+    e.preventDefault();
+    const btn = document.getElementById('form-submit-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<svg class="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/></svg> Salvando...';
+
+    const id = document.getElementById('form-id').value;
+    const payload = {
+      title:            document.getElementById('form-title').value.trim(),
+      category:         document.getElementById('form-category').value,
+      metrics_type:     document.getElementById('form-metrics-type').value,
+      volume_target:    parseInt(document.getElementById('form-volume-target').value) || 0,
+      volume_completed: parseInt(document.getElementById('form-volume-completed').value) || 0,
+      duration_minutes: parseInt(document.getElementById('form-duration').value),
+      intensity_rpe:    parseInt(document.getElementById('form-rpe').value) || null,
+      notes:            document.getElementById('form-notes').value.trim(),
+      completed:        document.getElementById('form-completed').checked,
+    };
+
+    let error;
+    if (id) {
+      ({ error } = await supabase.from('basketball_workouts').update(payload).eq('id', id));
+    } else {
+      ({ error } = await supabase.from('basketball_workouts').insert([payload]));
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = '<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg> Salvar Treino';
+
+    if (error) { App.toast('Erro: ' + error.message, 'error'); return; }
+
+    App.toast(id ? '✏️ Treino atualizado!' : '🏆 Treino criado!', 'success');
+    App.closeModal();
+    await App.loadAll();
+  },
+
+  async toggleComplete(id, current) {
+    const { error } = await supabase
+      .from('basketball_workouts')
+      .update({ completed: !current })
+      .eq('id', id);
+    if (error) { App.toast('Erro: ' + error.message, 'error'); return; }
+    await App.loadAll();
+  },
+
+  confirmDelete(id) {
+    State.deleteId = id;
+    document.getElementById('delete-overlay').classList.remove('hidden');
+  },
+
+  closeDelete() {
+    State.deleteId = null;
+    document.getElementById('delete-overlay').classList.add('hidden');
+  },
+
+  /* ── Modal ── */
+  openModal(workout = null) {
+    document.getElementById('modal-title').textContent = workout ? 'EDITAR TREINO' : 'NOVO TREINO';
+    document.getElementById('form-id').value = workout?.id || '';
+    document.getElementById('form-title').value = workout?.title || '';
+    document.getElementById('form-category').value = workout?.category || '';
+    document.getElementById('form-metrics-type').value = workout?.metrics_type || 'Repetições';
+    document.getElementById('form-volume-target').value = workout?.volume_target || '';
+    document.getElementById('form-volume-completed').value = workout?.volume_completed || '';
+    document.getElementById('form-duration').value = workout?.duration_minutes || '';
+    document.getElementById('form-rpe').value = workout?.intensity_rpe || '';
+    document.getElementById('form-notes').value = workout?.notes || '';
+    document.getElementById('form-completed').checked = workout?.completed || false;
+    App.updateMetricsLabel();
+    App.updateRPEVisual();
+    document.getElementById('modal-overlay').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+  },
+
+  closeModal() {
+    document.getElementById('modal-overlay').classList.add('hidden');
+    document.body.style.overflow = '';
+    document.getElementById('workout-form').reset();
+  },
+
+  handleOverlayClick(e) {
+    if (e.target === document.getElementById('modal-overlay')) App.closeModal();
+  },
+
+  updateMetricsLabel() {
+    const type = document.getElementById('form-metrics-type').value;
+    const cat  = document.getElementById('form-category').value;
+    let targetLabel = 'Meta de Volume', completedLabel = 'Volume Realizado';
+    if (type === 'Volume' && cat === 'Arremesso') {
+      targetLabel = 'Arremessos (meta)'; completedLabel = 'Arremessos convertidos';
+    } else if (type === 'Tempo') {
+      targetLabel = 'Tempo planejado (min)'; completedLabel = 'Tempo realizado (min)';
+    } else if (type === 'Repetições') {
+      targetLabel = 'Reps / Séries (meta)'; completedLabel = 'Reps / Séries feitas';
+    }
+    document.getElementById('lbl-target').textContent = targetLabel;
+    document.getElementById('lbl-completed').textContent = completedLabel;
+  },
+
+  updateRPEVisual() {
+    const rpe = parseInt(document.getElementById('form-rpe').value) || 0;
+    const wrap = document.getElementById('rpe-visual');
+    if (!rpe) { wrap.classList.add('hidden'); return; }
+    wrap.classList.remove('hidden');
+    wrap.innerHTML = Array.from({length:10},(_,i)=>{
+      const on = i < rpe;
+      return `<div class="rpe-dot" style="background:${on ? RPE_COLORS[rpe] : 'rgba(255,255,255,.1)'}; box-shadow:${on ? `0 0 6px ${RPE_COLORS[rpe]}` : 'none'}"></div>`;
+    }).join('');
+  },
+
+  /* ── Filters ── */
+  setCatFilter(btn, cat) {
+    State.catFilter = cat;
+    document.querySelectorAll('#filter-tabs .filter-tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    App.applyFilters();
+  },
+
+  setStatusFilter(btn, status) {
+    State.statusFilter = status;
+    document.querySelectorAll('[data-status]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    App.applyFilters();
+  },
+
+  applyFilters() {
+    const q     = (document.getElementById('search-input')?.value || '').toLowerCase();
+    const sort  = document.getElementById('sort-select')?.value || 'created_at_desc';
+
+    let list = State.workouts.filter(w => {
+      const matchCat    = !State.catFilter    || w.category === State.catFilter;
+      const matchStatus = State.statusFilter === '' || String(w.completed) === State.statusFilter;
+      const matchQ      = !q || w.title.toLowerCase().includes(q) || (w.notes||'').toLowerCase().includes(q);
+      return matchCat && matchStatus && matchQ;
+    });
+
+    list.sort((a,b) => {
+      if (sort === 'created_at_asc')  return new Date(a.created_at) - new Date(b.created_at);
+      if (sort === 'duration_desc')   return b.duration_minutes - a.duration_minutes;
+      if (sort === 'rpe_desc')        return (b.intensity_rpe||0) - (a.intensity_rpe||0);
+      return new Date(b.created_at) - new Date(a.created_at);
+    });
+
+    State.filtered = list;
+    App.renderWorkoutsGrid();
+  },
+
+  /* ── Views ── */
+  setView(name) {
+    State.currentView = name;
+    document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
+    document.getElementById(`view-${name}`)?.classList.remove('hidden');
+
+    // Desktop nav
+    document.querySelectorAll('[data-view]').forEach(el => {
+      const isActive = el.dataset.view === name;
+      el.classList.toggle('active', isActive);
+    });
+    // Mobile nav
+    document.querySelectorAll('[data-view-m]').forEach(el => {
+      el.classList.toggle('text-brand-400', el.dataset.viewM === name);
+      el.classList.toggle('text-slate-500', el.dataset.viewM !== name);
+    });
+  },
+
+  /* ── Render: Dashboard ── */
+  renderDashboard() {
+    // Date
+    const now = new Date();
+    document.getElementById('dashboard-date').textContent = now.toLocaleDateString('pt-BR', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
+
+    const total = State.workouts.length;
+    const done  = State.workouts.filter(w=>w.completed).length;
+    const thisMonth = State.workouts.filter(w=>{
+      const d = new Date(w.created_at);
+      return d.getMonth()===now.getMonth() && d.getFullYear()===now.getFullYear();
+    }).length;
+    const totalMin = State.workouts.reduce((s,w)=>s+w.duration_minutes,0);
+    const avgRpe   = State.workouts.filter(w=>w.intensity_rpe).length
+      ? (State.workouts.filter(w=>w.intensity_rpe).reduce((s,w)=>s+w.intensity_rpe,0)/State.workouts.filter(w=>w.intensity_rpe).length).toFixed(1)
+      : '—';
+
+    document.getElementById('stat-month-count').textContent = thisMonth;
+
+    const cards = [
+      { label:'Total de Treinos', value: total, icon:'🏋️', sub: `${done} concluídos` },
+      { label:'Horas Treinadas',  value: Math.round(totalMin/60)+'h', icon:'⏱️', sub: `${totalMin} minutos` },
+      { label:'RPE Médio',        value: avgRpe, icon:'🔥', sub: 'Intensidade geral' },
+      { label:'Este Mês',         value: thisMonth, icon:'📅', sub: 'treinos registrados' },
+    ];
+
+    document.getElementById('stat-cards').innerHTML = cards.map(c=>`
+      <div class="stat-card glass rounded-2xl p-5 flex flex-col gap-2">
+        <span class="text-2xl">${c.icon}</span>
+        <p class="font-display text-3xl text-white">${c.value}</p>
+        <p class="text-xs font-semibold text-slate-400 uppercase tracking-widest">${c.label}</p>
+        <p class="text-xs text-slate-600">${c.sub}</p>
+      </div>
+    `).join('');
+
+    // Recent list (last 5)
+    const recent = State.workouts.slice(0,5);
+    const recEl = document.getElementById('recent-list');
+    if (!recent.length) {
+      recEl.innerHTML = `<p class="text-slate-500 text-sm text-center py-6">Nenhum treino registrado ainda.</p>`;
+    } else {
+      recEl.innerHTML = recent.map(w => App.recentItem(w)).join('');
+    }
+
+    // Donut
+    App.renderDonut();
+  },
+
+  recentItem(w) {
+    const m = CAT_META[w.category] || {};
+    const pct = w.volume_target > 0 ? Math.min(100, Math.round(w.volume_completed/w.volume_target*100)) : null;
+    return `
+      <div class="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer group" onclick="App.openModal(${JSON.stringify(w).replace(/'/g,"&#39;").replace(/"/g,'&quot;')})">
+        <div class="w-9 h-9 rounded-xl flex items-center justify-center text-lg shrink-0" style="background:${m.color}22;">${m.emoji||'🏀'}</div>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-medium text-white truncate">${App.esc(w.title)}</p>
+          <p class="text-xs text-slate-500">${w.duration_minutes}min · RPE ${w.intensity_rpe||'—'} · ${App.relDate(w.created_at)}</p>
+          ${pct !== null ? `<div class="mt-1.5 h-1 bg-white/10 rounded-full w-full"><div class="progress-fill" style="width:${pct}%"></div></div>` : ''}
+        </div>
+        ${w.completed ? '<span class="text-green-400 text-xs font-semibold shrink-0">✓</span>' : ''}
+      </div>`;
+  },
+
+  renderDonut() {
+    const counts = {};
+    CATEGORIES.forEach(c => counts[c] = 0);
+    State.workouts.forEach(w => { if(counts[w.category] !== undefined) counts[w.category]++; });
+    const total = State.workouts.length || 1;
+
+    const size = 120, cx = 60, cy = 60, r = 44;
+    const circ = 2 * Math.PI * r;
+    let offset = 0;
+    let slices = '';
+    const legend = [];
+
+    CATEGORIES.forEach(cat => {
+      const count = counts[cat];
+      if (!count) return;
+      const pct   = count / total;
+      const dash  = pct * circ;
+      const m     = CAT_META[cat];
+      slices += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${m.color}" stroke-width="10"
+        stroke-dasharray="${dash} ${circ - dash}" stroke-dashoffset="${-offset}" class="radial-ring" style="transition:stroke-dashoffset .5s"/>`;
+      offset += dash;
+      legend.push({ cat, count, color: m.color, emoji: m.emoji, pct: Math.round(pct*100) });
+    });
+
+    if (!slices) {
+      document.getElementById('donut-wrap').innerHTML = `<p class="text-slate-600 text-sm text-center">Sem dados ainda.</p>`;
+      document.getElementById('donut-legend').innerHTML = '';
+      return;
+    }
+
+    document.getElementById('donut-wrap').innerHTML = `
+      <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+        <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="10"/>
+        ${slices}
+        <text x="${cx}" y="${cy+1}" text-anchor="middle" dominant-baseline="middle" fill="#f1f5f9" font-size="14" font-weight="700">${total}</text>
+        <text x="${cx}" y="${cy+13}" text-anchor="middle" dominant-baseline="middle" fill="#64748b" font-size="7">treinos</text>
+      </svg>`;
+
+    document.getElementById('donut-legend').innerHTML = legend.map(l=>`
+      <div class="flex items-center justify-between text-xs">
+        <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background:${l.color}"></span>
+          <span class="text-slate-400">${l.emoji} ${l.cat}</span>
+        </div>
+        <span class="font-semibold text-slate-200">${l.count} <span class="text-slate-500 font-normal">(${l.pct}%)</span></span>
+      </div>`).join('');
+  },
+
+  /* ── Render: Workouts Grid ── */
+  renderWorkoutsGrid() {
+    const grid = document.getElementById('workouts-grid');
+    if (!State.filtered.length) {
+      grid.innerHTML = `
+        <div class="col-span-full flex flex-col items-center justify-center py-20 text-center">
+          <span class="text-5xl mb-4">🏀</span>
+          <p class="text-slate-400 font-medium">Nenhum treino encontrado</p>
+          <p class="text-slate-600 text-sm mt-1">Tente ajustar os filtros ou registre um novo treino.</p>
+        </div>`;
+      return;
+    }
+    grid.innerHTML = State.filtered.map(w => App.workoutCard(w)).join('');
+  },
+
+  workoutCard(w) {
+    const m   = CAT_META[w.category] || { emoji:'🏀', badge:'badge-ball', color:'#fb923c' };
+    const pct = w.volume_target > 0 ? Math.min(100, Math.round(w.volume_completed/w.volume_target*100)) : null;
+    const rpeColor = RPE_COLORS[w.intensity_rpe] || '#64748b';
+    const safeW = JSON.stringify(w).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    return `
+    <div class="workout-card glass rounded-2xl p-5 flex flex-col gap-3 animate-slide-up">
+      <div class="flex items-start justify-between gap-2">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div class="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0" style="background:${m.color}22;">${m.emoji}</div>
+          <div class="min-w-0">
+            <h4 class="text-sm font-semibold text-white leading-snug truncate" title="${App.esc(w.title)}">${App.esc(w.title)}</h4>
+            <span class="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-bold border mt-0.5 ${m.badge}">${w.category}</span>
+          </div>
+        </div>
+        <div class="flex items-center gap-1.5 shrink-0">
+          ${w.completed ? `<span class="w-6 h-6 rounded-full bg-green-500/15 flex items-center justify-center">
+            <svg class="w-3.5 h-3.5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+          </span>` : ''}
+        </div>
+      </div>
+
+      <!-- Meta row -->
+      <div class="flex items-center gap-3 text-xs text-slate-500">
+        <span class="flex items-center gap-1">⏱️ ${w.duration_minutes}min</span>
+        ${w.intensity_rpe ? `<span class="flex items-center gap-1" style="color:${rpeColor}">🔥 RPE ${w.intensity_rpe}</span>` : ''}
+        <span class="flex items-center gap-1">📅 ${App.relDate(w.created_at)}</span>
+      </div>
+
+      <!-- Progress -->
+      ${pct !== null ? `
+      <div>
+        <div class="flex justify-between text-xs text-slate-500 mb-1.5">
+          <span>${w.metrics_type}</span>
+          <span class="font-semibold" style="color:${pct >= 100 ? '#4ade80' : '#f97316'}">${pct}% — ${w.volume_completed}/${w.volume_target}</span>
+        </div>
+        <div class="h-1.5 bg-white/10 rounded-full"><div class="progress-fill" style="width:${pct}%"></div></div>
+      </div>` : ''}
+
+      <!-- Notes -->
+      ${w.notes ? `<p class="text-xs text-slate-500 line-clamp-2 leading-relaxed">${App.esc(w.notes)}</p>` : ''}
+
+      <!-- RPE dots -->
+      ${w.intensity_rpe ? `
+      <div class="flex gap-1">
+        ${Array.from({length:10},(_,i)=>`<div class="rpe-dot" style="background:${i < w.intensity_rpe ? rpeColor : 'rgba(255,255,255,.08)'}; width:8px; height:8px;"></div>`).join('')}
+      </div>` : ''}
+
+      <!-- Actions -->
+      <div class="flex gap-2 mt-auto pt-2 border-t border-white/[0.06]">
+        <button onclick="App.toggleComplete('${w.id}', ${w.completed})"
+          class="flex-1 text-xs font-medium py-1.5 rounded-lg transition-colors ${w.completed ? 'bg-green-500/10 text-green-400 hover:bg-green-500/20' : 'bg-white/5 text-slate-400 hover:text-white hover:bg-white/10'}">
+          ${w.completed ? '✓ Concluído' : '○ Marcar Feito'}
+        </button>
+        <button onclick="App.openModal(JSON.parse(decodeURIComponent('${encodeURIComponent(JSON.stringify(w))}')))"
+          class="w-8 h-8 rounded-lg bg-white/5 text-slate-400 hover:text-brand-400 hover:bg-brand-500/10 flex items-center justify-center transition-colors">
+          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.172-8.172z"/></svg>
+        </button>
+        <button onclick="App.confirmDelete('${w.id}')"
+          class="w-8 h-8 rounded-lg bg-white/5 text-slate-400 hover:text-red-400 hover:bg-red-500/10 flex items-center justify-center transition-colors">
+          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+        </button>
+      </div>
+    </div>`;
+  },
+
+  /* ── Render: Stats ── */
+  renderStats() {
+    const el = document.getElementById('stats-content');
+    const total = State.workouts.length;
+    if (!total) {
+      el.innerHTML = `<div class="col-span-2 text-center py-16 text-slate-500">Registre treinos para ver suas estatísticas aqui.</div>`;
+      return;
+    }
+
+    const done = State.workouts.filter(w=>w.completed).length;
+    const pendente = total - done;
+    const totalMin = State.workouts.reduce((s,w)=>s+w.duration_minutes,0);
+    const rpeArr = State.workouts.filter(w=>w.intensity_rpe).map(w=>w.intensity_rpe);
+    const avgRpe = rpeArr.length ? (rpeArr.reduce((a,b)=>a+b,0)/rpeArr.length).toFixed(1) : '—';
+    const maxRpe = rpeArr.length ? Math.max(...rpeArr) : '—';
+
+    // Category breakdown
+    const catCount = {};
+    const catMin = {};
+    CATEGORIES.forEach(c => { catCount[c]=0; catMin[c]=0; });
+    State.workouts.forEach(w => {
+      catCount[w.category] = (catCount[w.category]||0)+1;
+      catMin[w.category]   = (catMin[w.category]||0)+w.duration_minutes;
+    });
+
+    const maxCat = Math.max(...Object.values(catCount));
+
+    el.innerHTML = `
+    <!-- Overview -->
+    <div class="glass rounded-2xl p-5 col-span-full md:col-span-1">
+      <h3 class="font-semibold text-white mb-4">Visão Geral</h3>
+      <div class="space-y-4">
+        ${[
+          {label:'Total de Treinos', val:total, icon:'🏋️'},
+          {label:'Treinos Concluídos', val:`${done} (${Math.round(done/total*100)}%)`, icon:'✅'},
+          {label:'Treinos Pendentes', val:pendente, icon:'⏳'},
+          {label:'Total de Minutos', val:totalMin, icon:'⏱️'},
+          {label:'Total de Horas', val:Math.round(totalMin/60)+'h', icon:'🕐'},
+          {label:'RPE Médio', val:avgRpe, icon:'🔥'},
+          {label:'Maior RPE', val:maxRpe, icon:'💥'},
+        ].map(x=>`
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="text-base">${x.icon}</span>
+              <span class="text-sm text-slate-400">${x.label}</span>
+            </div>
+            <span class="font-bold text-white">${x.val}</span>
+          </div>`).join('')}
+      </div>
+    </div>
+
+    <!-- Category Breakdown -->
+    <div class="glass rounded-2xl p-5 col-span-full md:col-span-1">
+      <h3 class="font-semibold text-white mb-4">Volume por Categoria</h3>
+      <div class="space-y-3">
+        ${CATEGORIES.filter(c=>catCount[c]>0).map(c=>{
+          const m   = CAT_META[c];
+          const pct = Math.round(catCount[c]/maxCat*100);
+          return `
+          <div>
+            <div class="flex justify-between text-xs mb-1">
+              <span class="text-slate-400">${m.emoji} ${c}</span>
+              <span class="font-semibold text-slate-200">${catCount[c]} treinos · ${Math.round(catMin[c]/60)}h</span>
+            </div>
+            <div class="h-2 bg-white/10 rounded-full">
+              <div style="width:${pct}%; background:${m.color};" class="h-full rounded-full transition-all"></div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+
+    <!-- RPE Distribution -->
+    <div class="glass rounded-2xl p-5 col-span-full">
+      <h3 class="font-semibold text-white mb-4">Distribuição de Intensidade (RPE)</h3>
+      <div class="flex items-end gap-2 h-24">
+        ${Array.from({length:10},(_,i)=>{
+          const rpe = i+1;
+          const cnt = State.workouts.filter(w=>w.intensity_rpe===rpe).length;
+          const maxCnt = Math.max(...Array.from({length:10},(_,j)=>State.workouts.filter(w=>w.intensity_rpe===(j+1)).length),1);
+          const h = Math.round(cnt/maxCnt*100);
+          return `
+          <div class="flex-1 flex flex-col items-center gap-1">
+            <span class="text-[10px] text-slate-500">${cnt||''}</span>
+            <div class="w-full rounded-t-sm transition-all" style="height:${h}%; background:${RPE_COLORS[rpe]}; min-height:${cnt?4:0}px;"></div>
+            <span class="text-[10px] font-bold" style="color:${RPE_COLORS[rpe]}">${rpe}</span>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  },
+
+  /* ── Helpers ── */
+  esc(str) {
+    return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  },
+
+  relDate(iso) {
+    const d  = new Date(iso);
+    const now = new Date();
+    const diff = Math.floor((now - d) / 86400000);
+    if (diff === 0) return 'hoje';
+    if (diff === 1) return 'ontem';
+    if (diff < 7)  return `${diff}d atrás`;
+    return d.toLocaleDateString('pt-BR', { day:'2-digit', month:'short' });
+  },
+
+  toast(msg, type='info') {
+    const c = document.getElementById('toast-container');
+    const colors = { success:'bg-court-800 border-green-500 text-green-300', error:'bg-court-800 border-red-500 text-red-300', info:'bg-court-800 border-brand-500 text-brand-300' };
+    const t = document.createElement('div');
+    t.className = `toast glass ${colors[type]} text-sm font-medium px-4 py-3 rounded-xl shadow-2xl max-w-xs`;
+    t.textContent = msg;
+    c.appendChild(t);
+    setTimeout(() => t.remove(), 3800);
+  },
+};
+
+/* ── Wire up delete confirm ── */
+document.getElementById('confirm-delete-btn').addEventListener('click', async () => {
+  if (!State.deleteId) return;
+  const { error } = await supabase.from('basketball_workouts').delete().eq('id', State.deleteId);
+  App.closeDelete();
+  if (error) { App.toast('Erro ao deletar: ' + error.message, 'error'); return; }
+  App.toast('🗑️ Treino deletado.', 'info');
+  await App.loadAll();
+});
+
+/* ── RPE live update in form ── */
+document.getElementById('form-rpe').addEventListener('input', App.updateRPEVisual);
+
+/* ── ESC closes modal ── */
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    if (!document.getElementById('modal-overlay').classList.contains('hidden')) App.closeModal();
+    if (!document.getElementById('delete-overlay').classList.contains('hidden')) App.closeDelete();
+  }
+});
+
+/* ── Auto-init from localStorage ── */
+(function bootstrap() {
+  const url = localStorage.getItem('ht_url');
+  const key = localStorage.getItem('ht_key');
+  if (url && key) {
+    document.getElementById('cfg-url').value = url;
+    document.getElementById('cfg-key').value = key;
+    App.init(url, key);
+  }
+})();
+</script>
+</body>
+</html>
